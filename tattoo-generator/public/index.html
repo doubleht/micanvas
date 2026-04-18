@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>타투 도안 생성기</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0a0a0a;
+      color: #fff;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container { max-width: 640px; margin: 0 auto; }
+    h1 { text-align: center; font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+    .subtitle { text-align: center; color: #555; font-size: 13px; margin-bottom: 24px; }
+
+    .status-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      background: #111; border: 1px solid #222; border-radius: 12px;
+      padding: 11px 16px; margin-bottom: 20px;
+    }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #444; margin-right: 8px; display: inline-block; }
+    .status-dot.connected { background: #4ade80; }
+    .status-text { font-size: 13px; color: #777; }
+    .login-btn { background: #fff; color: #000; border: none; border-radius: 8px; padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer; }
+
+    .steps { display: flex; flex-direction: column; gap: 14px; }
+
+    /* 장르 카드 */
+    .genre-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 4px; }
+    .genre-card {
+      background: #1a1a1a; border: 2px solid #222; border-radius: 12px;
+      padding: 14px 8px; text-align: center; cursor: pointer; transition: all 0.15s;
+    }
+    .genre-card:hover { border-color: #444; background: #1f1f1f; }
+    .genre-card.selected { border-color: #fff; background: #222; }
+    .genre-icon { font-size: 24px; margin-bottom: 6px; }
+    .genre-name { font-size: 13px; font-weight: 600; }
+    .genre-desc { font-size: 11px; color: #555; margin-top: 3px; }
+    .step { background: #111; border: 1px solid #1e1e1e; border-radius: 16px; padding: 20px; }
+    .step.active { border-color: #333; }
+    .step.done { border-color: #4ade8033; }
+    .step-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+    .step-num { width: 26px; height: 26px; border-radius: 50%; background: #222; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #555; flex-shrink: 0; }
+    .step.active .step-num { background: #fff; color: #000; }
+    .step.done .step-num { background: #4ade80; color: #000; }
+    .step-title { font-size: 15px; font-weight: 600; }
+
+    .label { font-size: 12px; color: #555; margin-bottom: 8px; }
+
+    /* 채팅 UI */
+    .chat-box {
+      background: #0d0d0d; border: 1px solid #222; border-radius: 12px;
+      padding: 14px; min-height: 120px; max-height: 260px; overflow-y: auto;
+      margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px;
+    }
+    .chat-msg { display: flex; gap: 8px; align-items: flex-start; }
+    .chat-msg.user { flex-direction: row-reverse; }
+    .chat-bubble {
+      max-width: 80%; padding: 9px 13px; border-radius: 12px;
+      font-size: 13px; line-height: 1.5;
+    }
+    .chat-msg.ai .chat-bubble { background: #1a1a1a; color: #ccc; border-radius: 4px 12px 12px 12px; }
+    .chat-msg.user .chat-bubble { background: #fff; color: #000; border-radius: 12px 4px 12px 12px; }
+    .chat-avatar { width: 24px; height: 24px; border-radius: 50%; background: #222; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; margin-top: 2px; }
+
+    .chat-input-row { display: flex; gap: 8px; }
+    .chat-input {
+      flex: 1; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 10px;
+      padding: 10px 14px; color: #fff; font-size: 14px; outline: none; resize: none;
+      font-family: inherit;
+    }
+    .chat-input:focus { border-color: #444; }
+    .chat-input::placeholder { color: #444; }
+
+    button.primary {
+      background: #fff; color: #000; border: none; border-radius: 10px;
+      padding: 10px 16px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;
+    }
+    button.primary:disabled { background: #2a2a2a; color: #555; cursor: not-allowed; }
+    button.primary:hover:not(:disabled) { background: #e0e0e0; }
+
+    /* 소재 태그 */
+    .material-grid { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+    .material-tag {
+      background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 20px;
+      padding: 6px 13px; font-size: 13px; cursor: pointer; transition: all 0.15s;
+    }
+    .material-tag:hover { border-color: #555; }
+    .material-tag.selected { background: #fff; color: #000; border-color: #fff; }
+
+    /* 사진 라이브러리 */
+    .photo-upload-area {
+      border: 2px dashed #2a2a2a; border-radius: 12px; padding: 20px;
+      text-align: center; cursor: pointer; transition: border-color 0.2s; margin-bottom: 12px;
+    }
+    .photo-upload-area:hover { border-color: #444; }
+    .photo-upload-area p { color: #555; font-size: 13px; }
+    .photo-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .photo-item { position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden; cursor: pointer; border: 2px solid transparent; transition: all 0.15s; }
+    .photo-item:hover { border-color: #555; }
+    .photo-item.selected { border-color: #4ade80; }
+    .photo-item img { width: 100%; height: 100%; object-fit: cover; }
+    .photo-check {
+      position: absolute; top: 4px; right: 4px; width: 20px; height: 20px;
+      background: #4ade80; border-radius: 50%; display: none;
+      align-items: center; justify-content: center; font-size: 11px; color: #000; font-weight: 700;
+    }
+    .photo-item.selected .photo-check { display: flex; }
+    .photo-del {
+      position: absolute; top: 4px; left: 4px; width: 18px; height: 18px;
+      background: #ff4444; border-radius: 50%; display: flex;
+      align-items: center; justify-content: center; font-size: 10px; color: #fff; cursor: pointer;
+      opacity: 0; transition: opacity 0.15s;
+    }
+    .photo-item:hover .photo-del { opacity: 1; }
+
+    /* 스타일/부위 */
+    .select-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 8px; }
+    .select-item {
+      background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 10px;
+      padding: 9px 12px; font-size: 13px; cursor: pointer; text-align: center; transition: all 0.15s;
+    }
+    .select-item:hover { border-color: #555; }
+    .select-item.selected { background: #fff; color: #000; border-color: #fff; }
+
+    /* 프롬프트 */
+    .prompt-box {
+      background: #0d0d0d; border: 1px solid #2a2a2a; border-radius: 10px;
+      padding: 13px; font-size: 12px; color: #aaa; line-height: 1.7;
+      margin-top: 12px; word-break: break-all; display: none;
+    }
+    .prompt-box.visible { display: block; }
+
+    /* 전송 */
+    .send-btn {
+      width: 100%; background: #4ade80; color: #000; border: none;
+      border-radius: 12px; padding: 14px; font-size: 15px; font-weight: 700;
+      cursor: pointer; margin-top: 10px;
+    }
+    .send-btn:hover { background: #22c55e; }
+    .send-btn:disabled { background: #1a2a1a; color: #3a6a3a; cursor: not-allowed; }
+
+    .result {
+      background: #0d0d0d; border: 1px solid #2a2a2a; border-radius: 12px;
+      padding: 16px; text-align: center; margin-top: 12px; display: none;
+    }
+    .result.visible { display: block; }
+    .result.success { border-color: #4ade8044; }
+    .result.error { border-color: #f8717144; }
+    .result-icon { font-size: 28px; margin-bottom: 6px; }
+    .result-text { font-size: 13px; color: #888; }
+
+    .loading { color: #555; font-size: 13px; text-align: center; padding: 8px; display: none; }
+    .loading.visible { display: block; }
+
+    .selected-count { font-size: 12px; color: #4ade80; margin-top: 8px; display: none; }
+    .selected-count.visible { display: block; }
+
+    input[type="file"] { display: none; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>🖋 타투 도안 생성기</h1>
+  <p class="subtitle">소재 선택 → 레퍼런스 선택 → 미드저니 자동 전송</p>
+
+  <div class="status-bar">
+    <div>
+      <span class="status-dot" id="statusDot"></span>
+      <span class="status-text" id="statusText">확인 중...</span>
+    </div>
+    <button class="login-btn" id="loginBtn" onclick="login()">로그인</button>
+  </div>
+
+  <div class="steps">
+
+    <!-- Step 0: 장르/스타일 선택 -->
+    <div class="step active" id="step0">
+      <div class="step-header">
+        <div class="step-num" id="num0">1</div>
+        <div class="step-title">스타일 장르 선택</div>
+      </div>
+      <div class="genre-grid">
+        <div class="genre-card" onclick="selectGenre(this, '블랙워크')">
+          <div class="genre-icon">◼</div>
+          <div class="genre-name">블랙워크</div>
+          <div class="genre-desc">굵고 강한 검정</div>
+        </div>
+        <div class="genre-card" onclick="selectGenre(this, '파인라인')">
+          <div class="genre-icon">✦</div>
+          <div class="genre-name">파인라인</div>
+          <div class="genre-desc">섬세한 가는 선</div>
+        </div>
+        <div class="genre-card" onclick="selectGenre(this, '수채화')">
+          <div class="genre-icon">🎨</div>
+          <div class="genre-name">수채화</div>
+          <div class="genre-desc">물감 번지는 느낌</div>
+        </div>
+        <div class="genre-card" onclick="selectGenre(this, '점묘')">
+          <div class="genre-icon">· · ·</div>
+          <div class="genre-name">점묘</div>
+          <div class="genre-desc">점으로 표현</div>
+        </div>
+        <div class="genre-card" onclick="selectGenre(this, '크레용')">
+          <div class="genre-icon">🖍</div>
+          <div class="genre-name">크레용</div>
+          <div class="genre-desc">거친 텍스처</div>
+        </div>
+        <div class="genre-card" onclick="selectGenre(this, '리얼리즘')">
+          <div class="genre-icon">📷</div>
+          <div class="genre-name">리얼리즘</div>
+          <div class="genre-desc">사실적 표현</div>
+        </div>
+        <div class="genre-card" onclick="selectGenre(this, '재패니즈')">
+          <div class="genre-icon">⛩</div>
+          <div class="genre-name">재패니즈</div>
+          <div class="genre-desc">일본 전통 이레즈미</div>
+        </div>
+        <div class="genre-card" onclick="selectGenre(this, '지오메트릭')">
+          <div class="genre-icon">△</div>
+          <div class="genre-name">지오메트릭</div>
+          <div class="genre-desc">기하학적 도형</div>
+        </div>
+        <div class="genre-card" onclick="selectGenre(this, '트래디셔널')">
+          <div class="genre-icon">⚓</div>
+          <div class="genre-name">트래디셔널</div>
+          <div class="genre-desc">올드스쿨 클래식</div>
+        </div>
+        <div class="genre-card" onclick="selectGenre(this, '색연필')">
+          <div class="genre-icon">✏️</div>
+          <div class="genre-name">색연필</div>
+          <div class="genre-desc">부드러운 색연필 느낌</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 1: 소재 생성 (채팅형) -->
+    <div class="step" id="step1">
+      <div class="step-header">
+        <div class="step-num">2</div>
+        <div class="step-title">소재 생성하기</div>
+      </div>
+      <div class="chat-box" id="chatBox">
+        <div class="chat-msg ai">
+          <div class="chat-avatar">AI</div>
+          <div class="chat-bubble">어떤 타투를 원하세요? 원하는 소재나 느낌을 자유롭게 말해주세요 😊</div>
+        </div>
+      </div>
+      <div class="chat-input-row">
+        <textarea class="chat-input" id="chatInput" placeholder="예) 꽃이랑 나비 조합, 신비로운 느낌..." rows="1" onkeydown="handleChatKey(event)"></textarea>
+        <button class="primary" onclick="sendChat()">전송</button>
+      </div>
+      <div class="material-grid" id="materialGrid"></div>
+    </div>
+
+    <!-- Step 2: 레퍼런스 사진 선택 -->
+    <div class="step" id="step2">
+      <div class="step-header">
+        <div class="step-num">3</div>
+        <div class="step-title">레퍼런스 사진 선택</div>
+      </div>
+      <div class="photo-upload-area" onclick="document.getElementById('photoInput').click()">
+        <p>+ 사진 추가하기 (여러 장 가능)</p>
+      </div>
+      <input type="file" id="photoInput" multiple accept="image/*" onchange="uploadPhotos(this)">
+      <div class="photo-grid" id="photoGrid"></div>
+      <div class="selected-count" id="selectedCount"></div>
+      <div class="loading" id="photoLoading">업로드 중...</div>
+    </div>
+
+    <!-- Step 3: 부위 + 프롬프트 -->
+    <div class="step" id="step3">
+      <div class="step-header">
+        <div class="step-num">4</div>
+        <div class="step-title">프롬프트 생성</div>
+      </div>
+      <div class="label">부위</div>
+      <div class="select-grid">
+        <div class="select-item" onclick="selectPlacement(this, '팔')">팔</div>
+        <div class="select-item" onclick="selectPlacement(this, '손목')">손목</div>
+        <div class="select-item" onclick="selectPlacement(this, '어깨')">어깨</div>
+        <div class="select-item" onclick="selectPlacement(this, '등')">등</div>
+        <div class="select-item" onclick="selectPlacement(this, '발목')">발목</div>
+        <div class="select-item" onclick="selectPlacement(this, '가슴')">가슴</div>
+        <div class="select-item" onclick="selectPlacement(this, '목')">목</div>
+        <div class="select-item" onclick="selectPlacement(this, '허벅지')">허벅지</div>
+      </div>
+      <div class="prompt-box" id="promptBox"></div>
+      <div class="loading" id="promptLoading">프롬프트 생성 중...</div>
+    </div>
+
+    <!-- Step 4: 미드저니 전송 -->
+    <div class="step" id="step4">
+      <div class="step-header">
+        <div class="step-num">5</div>
+        <div class="step-title">미드저니에 입력</div>
+      </div>
+      <button class="send-btn" id="sendBtn" onclick="sendToMidjourney()">미드저니로 전송하기</button>
+      <div class="loading" id="sendLoading">미드저니 접속 중...</div>
+      <div class="result" id="result">
+        <div class="result-icon" id="resultIcon"></div>
+        <div class="result-text" id="resultText"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  let selectedGenre = null;
+  let selectedMaterial = null;
+  let selectedStyle = null;
+  let selectedPlacement = null;
+  let currentPrompt = null;
+  let selectedPhotos = new Set();
+  let chatHistory = [];
+
+  function selectGenre(el, genre) {
+    document.querySelectorAll('.genre-card').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    selectedGenre = genre;
+    selectedStyle = genre;
+    document.getElementById('step0').classList.add('done');
+    document.getElementById('step1').classList.add('active');
+  }
+
+  async function checkStatus() {
+    const res = await fetch('/api/status');
+    const { loggedIn } = await res.json();
+    document.getElementById('statusDot').classList.toggle('connected', loggedIn);
+    document.getElementById('statusText').textContent = loggedIn ? '미드저니 연결됨' : '미드저니 연결 안됨';
+    document.getElementById('loginBtn').textContent = loggedIn ? '재로그인' : '로그인';
+  }
+
+  async function login() {
+    const btn = document.getElementById('loginBtn');
+    btn.textContent = '브라우저 열리는 중...';
+    btn.disabled = true;
+    await fetch('/api/login', { method: 'POST' });
+    btn.disabled = false;
+    await checkStatus();
+  }
+
+  function handleChatKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+  }
+
+  async function sendChat() {
+    const input = document.getElementById('chatInput');
+    const text = input.value.trim();
+    if (!text) return;
+
+    addChatMsg('user', text);
+    chatHistory.push({ role: 'user', content: text });
+    input.value = '';
+
+    const res = await fetch('/api/materials', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keyword: text, history: chatHistory })
+    });
+    const data = await res.json();
+
+    addChatMsg('ai', data.reply);
+    chatHistory.push({ role: 'ai', content: data.reply });
+
+    const grid = document.getElementById('materialGrid');
+    grid.innerHTML = '';
+    data.materials.forEach(m => {
+      const tag = document.createElement('div');
+      tag.className = 'material-tag';
+      tag.textContent = m;
+      tag.onclick = () => {
+        document.querySelectorAll('.material-tag').forEach(t => t.classList.remove('selected'));
+        tag.classList.add('selected');
+        selectedMaterial = m;
+        document.getElementById('step1').classList.add('done');
+        document.getElementById('step2').classList.add('active');
+        tryGeneratePrompt();
+      };
+      grid.appendChild(tag);
+    });
+  }
+
+  function addChatMsg(role, text) {
+    const box = document.getElementById('chatBox');
+    const div = document.createElement('div');
+    div.className = `chat-msg ${role}`;
+    div.innerHTML = `
+      <div class="chat-avatar">${role === 'ai' ? 'AI' : '나'}</div>
+      <div class="chat-bubble">${text}</div>
+    `;
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  async function uploadPhotos(input) {
+    const files = input.files;
+    if (!files.length) return;
+
+    const loading = document.getElementById('photoLoading');
+    loading.classList.add('visible');
+
+    const formData = new FormData();
+    for (const f of files) formData.append('photos', f);
+
+    await fetch('/api/photos/upload', { method: 'POST', body: formData });
+    loading.classList.remove('visible');
+    input.value = '';
+    loadPhotos();
+  }
+
+  async function loadPhotos() {
+    const res = await fetch('/api/photos');
+    const { photos } = await res.json();
+    const grid = document.getElementById('photoGrid');
+    grid.innerHTML = '';
+
+    photos.forEach(p => {
+      const item = document.createElement('div');
+      item.className = 'photo-item' + (selectedPhotos.has(p.file) ? ' selected' : '');
+      item.innerHTML = `
+        <img src="${p.url}" alt="">
+        <div class="photo-check">✓</div>
+        <div class="photo-del" onclick="deletePhoto(event, '${p.file}')">✕</div>
+      `;
+      item.onclick = () => togglePhoto(item, p.file);
+      grid.appendChild(item);
+    });
+
+    updateSelectedCount();
+  }
+
+  function togglePhoto(item, filename) {
+    if (selectedPhotos.has(filename)) {
+      selectedPhotos.delete(filename);
+      item.classList.remove('selected');
+    } else {
+      selectedPhotos.add(filename);
+      item.classList.add('selected');
+    }
+    updateSelectedCount();
+    if (selectedPhotos.size > 0) {
+      document.getElementById('step2').classList.add('done');
+      document.getElementById('step3').classList.add('active');
+    }
+  }
+
+  async function deletePhoto(e, filename) {
+    e.stopPropagation();
+    selectedPhotos.delete(filename);
+    await fetch(`/api/photos/${filename}`, { method: 'DELETE' });
+    loadPhotos();
+  }
+
+  function updateSelectedCount() {
+    const el = document.getElementById('selectedCount');
+    if (selectedPhotos.size > 0) {
+      el.textContent = `${selectedPhotos.size}장 선택됨`;
+      el.classList.add('visible');
+    } else {
+      el.classList.remove('visible');
+    }
+  }
+
+  function selectStyle(el, style) {
+    document.querySelectorAll('#step3 .select-grid:first-of-type .select-item').forEach(i => i.classList.remove('selected'));
+    el.classList.add('selected');
+    selectedStyle = style;
+    tryGeneratePrompt();
+  }
+
+  function selectPlacement(el, placement) {
+    document.querySelectorAll('#step3 .select-grid:last-of-type .select-item').forEach(i => i.classList.remove('selected'));
+    el.classList.add('selected');
+    selectedPlacement = placement;
+    tryGeneratePrompt();
+  }
+
+  async function tryGeneratePrompt() {
+    if (!selectedMaterial || !selectedStyle || !selectedPlacement) return;
+
+    const loading = document.getElementById('promptLoading');
+    const box = document.getElementById('promptBox');
+    loading.classList.add('visible');
+    box.classList.remove('visible');
+
+    const res = await fetch('/api/prompt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ material: selectedMaterial, style: selectedStyle, placement: selectedPlacement })
+    });
+    const data = await res.json();
+    loading.classList.remove('visible');
+
+    currentPrompt = data.prompt;
+    box.textContent = data.prompt;
+    box.classList.add('visible');
+
+    document.getElementById('step3').classList.add('done');
+    document.getElementById('step4').classList.add('active');
+  }
+
+  async function sendToMidjourney() {
+    if (!currentPrompt) return;
+    const btn = document.getElementById('sendBtn');
+    const loading = document.getElementById('sendLoading');
+    const result = document.getElementById('result');
+
+    btn.disabled = true;
+    loading.classList.add('visible');
+    result.classList.remove('visible', 'success', 'error');
+
+    const res = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: currentPrompt, photoFiles: [...selectedPhotos] })
+    });
+    const data = await res.json();
+
+    loading.classList.remove('visible');
+    btn.disabled = false;
+    result.classList.add('visible', data.success ? 'success' : 'error');
+    document.getElementById('resultIcon').textContent = data.success ? '✅' : '❌';
+    document.getElementById('resultText').textContent = data.success ? data.message : data.error;
+  }
+
+  checkStatus();
+  loadPhotos();
+</script>
+</body>
+</html>
